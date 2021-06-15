@@ -90,12 +90,12 @@ def main():
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
     train_loader = torch.utils.data.DataLoader(
         datasets.MNIST(
-            '../data/MNIST', train=True, download=True,
+            '/home/congen/code/geoml_gan/data', train=True, download=False,
             transform=transforms.ToTensor()),
         batch_size=args.batch_size, shuffle=True, **kwargs
     )
     test_loader = torch.utils.data.DataLoader(
-        datasets.MNIST('../data/MNIST', train=False, transform=transforms.ToTensor()),
+        datasets.MNIST('/home/congen/code/geoml_gan/data', train=False, transform=transforms.ToTensor()),
         batch_size=args.test_batch_size, shuffle=True, **kwargs
     )
 
@@ -109,8 +109,19 @@ def main():
         if acc > best_acc:
             best_acc = acc
             print('Saving model!')
-            torch.save(model.state_dict(), 'pretrained_classifier.pt')
+            torch.save(model.state_dict(), 'logs/classifier/pretrained_classifier.pt')
+
+"""
+    Usage:
+
+        export CUDA_VISIBLE_DEVICES=1
+        export PORT=6006
+        export CUDA_HOME=/opt/cuda/cuda-10.2
+        export TIME_STR=1
+        python scripts/train/classifier_mnist.py 
 
 
+    :return:
+    """
 if __name__ == '__main__':
     main()

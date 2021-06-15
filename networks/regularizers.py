@@ -23,4 +23,36 @@ def score_penalty(netE, data, beta=1.):
         grad_outputs=torch.ones_like(energy),
         create_graph=True, retain_graph=True, only_inputs=True
     )[0]
+    score=score.flatten(start_dim=1)
     return (score.norm(2, dim=1) ** 2).mean()
+
+def gp_sm(netE, x,G_z):
+    G_z.requires_grad_()
+    D_x = netE(G_z)
+    G_mean=G_z.mean(dim=0)
+    x_mean=x.mean(dim=0)
+    #M=((G_z-G_mean).flatten(start_dim=1).norm(2,dim=-1)**2).mean().sqrt()
+    M = ((x_mean - G_mean).flatten().norm(2, dim=-1) ** 2).mean().sqrt()
+    #x.requires_grad_()
+    gradients = torch.autograd.grad(
+        outputs=D_x,
+        inputs=G_z,
+        grad_outputs=torch.ones_like(D_x),
+        allow_unused=True,
+        create_graph=True,retain_graph=True
+    )[0]
+    gradients = gradients.flatten(start_dim=1)
+    v = torch.randn(G_z.shape).cuda().flatten(start_dim=1)
+    gradients2 = torch.autograd.grad(
+        outputs=(v * gradients).sum(dim=1),
+        inputs=G_z,
+        grad_outputs=torch.ones_like((v * gradients).sum(dim=1)),
+        allow_unused=True,
+        create_graph=True,retain_graph=True
+    )[0]
+    gradients2 = gradients2.flatten(start_dim=1)
+    J = (gradients.norm(2, dim=1) ** 2).mean()+ (gradients2 * v).sum(dim=1).mean()*2
+    gp_loss=J*M.detach()
+    # L2 norm
+    #gp_loss = J + (gradients2 * v).sum(dim=1).mean()
+    return gp_loss

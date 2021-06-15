@@ -4,6 +4,9 @@ import os
 import sys
 import time
 import numpy as np
+import json
+from easydict import EasyDict
+import yaml
 import torch
 from torchvision.utils import save_image, make_grid
 from tensorboardX import SummaryWriter
@@ -11,13 +14,24 @@ from tensorboardX import SummaryWriter
 sys.path.append("./")
 sys.path.append("scripts/")
 
-from evals import tf_inception_score
+from evals import tf_fid_is_score
 from utils import save_samples
 from data.cifar import inf_train_gen
 from networks.cifar import Generator, EnergyModel, StatisticsNetwork
 from functions import train_generator, train_energy_model
 
+"""
+    Usage:
 
+        export CUDA_VISIBLE_DEVICES=1
+        export PORT=6006
+        export CUDA_HOME=/opt/cuda/cuda-10.2
+        export TIME_STR=1
+        python scripts/train/ebm_cifar.py --save_path logs/cifar
+
+
+    :return:
+    """
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--save_path", required=True)
@@ -27,8 +41,8 @@ def parse_args():
 
     parser.add_argument("--energy_model_iters", type=int, default=5)
     parser.add_argument("--generator_iters", type=int, default=1)
-    parser.add_argument("--lamda", type=float, default=10)
-
+    parser.add_argument("--lamda", type=float, default=0.1)
+    parser.add_argument('--fid_cache', type=str,default='/home/congen/code/AGE/data/tf_fid_stats_cifar10_32.npz')
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--iters", type=int, default=100000)
     parser.add_argument("--log_interval", type=int, default=100)
@@ -39,7 +53,7 @@ def parse_args():
 
 
 args = parse_args()
-root = Path(args.save_path)
+root = Path(os.path.join(args.save_path+  '/%02d' % args.energy_model_iters + '/%03d' % int(time.time())))
 #################################################
 # Create Directories
 #################################################
@@ -49,6 +63,8 @@ if root.exists():
 os.makedirs(str(root))
 os.system("mkdir -p %s" % str(root / "models"))
 os.system("mkdir -p %s" % str(root / "images"))
+with open("{}/args.txt".format(root), 'w') as f:
+    json.dump(args.__dict__, f, indent=4, sort_keys=True)
 writer = SummaryWriter(str(root))
 #################################################
 
@@ -67,7 +83,7 @@ optimizerH = torch.optim.Adam(netH.parameters(), **params)
 ########################################################################
 for i in range(8):
     orig_data = itr.__next__()
-    # save_image(orig_data, root / 'images/orig.png', normalize=True)
+    #save_image(orig_data, root / 'images/orig.png', normalize=True)
     img = make_grid(orig_data, normalize=True)
     writer.add_image("samples/original", img, i)
 ########################################################################
@@ -112,13 +128,15 @@ for iters in range(args.iters):
         start_time = time.time()
 
     if iters % args.save_interval == 0:
-        mean, std = tf_inception_score(netG, z_dim=args.z_dim)
-        print("-" * 100)
-        print("Inception Score: mean = {} std = {}".format(mean, std))
-        print("-" * 100)
-
-        writer.add_scalar("inception_score/mean", mean, iters)
-        writer.add_scalar("inception_score/std", std, iters)
+        is_score, fid_score= tf_fid_is_score(args, netG, z_dim=args.z_dim)
+        # print("-" * 100)
+        # print("Inception Score: mean = {} std = {}".format(mean, std))
+        # print("-" * 100)
+        writer.add_scalar('inception_score', is_score[0], iters)
+        writer.add_scalar('inception_score_std', is_score[1], iters)
+        writer.add_scalar('fid_score', fid_score, iters)
+        #writer.add_scalar("inception_score/mean", mean, iters)
+        #writer.add_scalar("inception_score/std", std, iters)
 
         torch.save(netG.state_dict(), root / "models/netG.pt")
         torch.save(netE.state_dict(), root / "models/netE.pt")

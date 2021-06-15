@@ -5,44 +5,56 @@ import os
 import time
 import numpy as np
 from tensorboardX import SummaryWriter
-
+import json
 import torch
 import sys
 sys.path.append('./')
 sys.path.append('scripts/')
 
-from utils import save_toy_samples, save_energies
+from utils import save_toy_samples, save_energies, visualize_results
 from data.toy import inf_train_gen
-from networks.toy import Generator, EnergyModel, StatisticsNetwork
+from networks.toy import Generator, EnergyModel, StatisticsNetwork,Generator2,EnergyModel2
 from functions import train_generator, train_energy_model
 
+"""
+    Usage:
 
+        export CUDA_VISIBLE_DEVICES=2
+        export PORT=6006
+        export CUDA_HOME=/opt/cuda/cuda-10.2
+        export TIME_STR=1
+        python scripts/train/ebm_toy.py --dataset 25gaussians --save_path logs
+
+
+    :return:
+    """
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', required=True)
     parser.add_argument('--save_path', required=True)
 
     parser.add_argument('--z_dim', type=int, default=2)
-    parser.add_argument('--dim', type=int, default=512)
+    parser.add_argument('--dim', type=int, default=100)
 
-    parser.add_argument('--energy_model_iters', type=int, default=5)
+    parser.add_argument('--energy_model_iters', type=int, default=1)
     parser.add_argument('--generator_iters', type=int, default=1)
     parser.add_argument('--mcmc_iters', type=int, default=0)
-    parser.add_argument('--lamda', type=float, default=.1)
+    parser.add_argument('--lamda', type=float, default=1)
     parser.add_argument('--alpha', type=float, default=.01)
 
-    parser.add_argument('--batch_size', type=int, default=256)
-    parser.add_argument('--iters', type=int, default=100000)
+    parser.add_argument('--batch_size', type=int, default=200)
+    parser.add_argument('--iters', type=int, default=150000)
     parser.add_argument('--n_points', type=int, default=1600)
-    parser.add_argument('--log_interval', type=int, default=100)
-    parser.add_argument('--save_interval', type=int, default=1000)
+    parser.add_argument('--log_interval', type=int, default=5000)
+    parser.add_argument('--save_interval', type=int, default=5000)
 
     args = parser.parse_args()
     return args
 
 
 args = parse_args()
-root = Path(args.save_path)
+#root = Path(args.save_path)
+root = Path(os.path.join(args.save_path+ '/' + args.dataset + '_soft/%02d' % args.energy_model_iters + '/%03d' % int(time.time())))
 #################################################
 # Create Directories
 #################################################
@@ -52,15 +64,17 @@ if root.exists():
 os.makedirs(str(root))
 os.system('mkdir -p %s' % str(root / 'models'))
 os.system('mkdir -p %s' % str(root / 'images'))
+with open("{}/args.txt".format(root), 'w') as f:
+    json.dump(args.__dict__, f, indent=4, sort_keys=True)
 writer = SummaryWriter(str(root))
 #################################################
 itr = inf_train_gen(args.dataset, args.batch_size)
 
-netG = Generator(args.z_dim, args.dim).cuda()
-netE = EnergyModel(args.dim).cuda()
+netG = Generator2(args.z_dim, args.dim).cuda()
+netE = EnergyModel2(args.dim).cuda()
 netH = StatisticsNetwork(args.z_dim, args.dim).cuda()
-
-params = {'lr': 1e-4, 'betas': (0.5, 0.9)}
+#netG.load_state_dict(torch.load('logs/twomoon_1/models/netG.pt'))
+params = {'lr': 2e-4, 'betas': (0.0, 0.9)}
 optimizerE = torch.optim.Adam(netE.parameters(), **params)
 optimizerG = torch.optim.Adam(netG.parameters(), **params)
 optimizerH = torch.optim.Adam(netH.parameters(), **params)
@@ -73,6 +87,7 @@ fig = plt.Figure()
 ax = fig.add_subplot(111)
 ax.scatter(orig_data[:, 0], orig_data[:, 1])
 writer.add_figure('originals', fig, 0)
+#plt.savefig(("{}/data.png" ).format(str(Path(args.save_path) / 'images')))
 ##################################################
 
 start_time = time.time()
@@ -112,6 +127,7 @@ for iters in range(args.iters):
                   np.asarray(g_costs).mean(0),
                   (time.time() - start_time) / args.log_interval
               ))
+        #visualize_results(netG,netE,orig_data, args, iters)
         fig_samples = save_toy_samples(netG, args)
         e_fig, p_fig = save_energies(netE, args)
 

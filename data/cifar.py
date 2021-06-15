@@ -9,7 +9,7 @@ def inf_train_gen(batch_size):
     ])
     loader = torch.utils.data.DataLoader(
         datasets.CIFAR10(
-            '../data/CIFAR10', train=True, download=True,
+            '/home/congen/code/AGE/data/raw/cifar10', train=True, download=False,
             transform=transf
         ), batch_size=64, drop_last=True
     )

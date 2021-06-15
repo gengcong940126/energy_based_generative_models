@@ -1,12 +1,11 @@
 import torch
 import torch.nn as nn
-from networks.regularizers import score_penalty, gradient_penalty
+from networks.regularizers import score_penalty, gradient_penalty,gp_sm
 
 
 def train_generator(netG, netE, netH, optimizerG, optimizerH, args, g_costs):
-    netG.zero_grad()
-    netH.zero_grad()
-
+    optimizerG.step()
+    optimizerH.step()
     # z = MALA_corrected_sampler(netG, netE, args)
     z = torch.randn(args.batch_size, args.z_dim).cuda()
     x_fake = netG(z)
@@ -22,19 +21,18 @@ def train_generator(netG, netE, netH, optimizerG, optimizerH, args, g_costs):
     z_bar = z[torch.randperm(args.batch_size)]
     concat_x = torch.cat([x_fake, x_fake], 0)
     concat_z = torch.cat([z, z_bar], 0)
+    #mi_estimate = nn.BCEWithLogitsLoss()(netH(concat_x.reshape([args.batch_size*2,args.n_stack,28,28]), concat_z).squeeze(), label)
     mi_estimate = nn.BCEWithLogitsLoss()(netH(concat_x, concat_z).squeeze(), label)
-
+    netG.zero_grad()
+    netH.zero_grad()
     (D_fake + mi_estimate).backward()
-
-    optimizerG.step()
-    optimizerH.step()
 
     g_costs.append([D_fake.item(), mi_estimate.item()])
 
 
 def train_energy_model(x_real, netG, netE, optimizerE, args, e_costs):
     netE.zero_grad()
-
+    x_real.requires_grad_()
     D_real = netE(x_real)
     D_real = D_real.mean()
 
@@ -45,21 +43,21 @@ def train_energy_model(x_real, netG, netE, optimizerE, args, e_costs):
     D_fake = netE(x_fake)
     D_fake = D_fake.mean()
 
-    penalty = score_penalty(netE, x_real)
+    #penalty = score_penalty(netE, x_real)
+    penalty = gp_sm(netE, x_real,x_fake)
     (D_real - D_fake + args.lamda * penalty).backward()
-
     optimizerE.step()
 
     e_costs.append([D_real.item(), D_fake.item(), penalty.item()])
 
 
 def train_wgan_generator(netG, netD, optimizerG, args):
-    netG.zero_grad()
 
     z = torch.randn(args.batch_size, args.z_dim).cuda()
     x_fake = netG(z)
     D_fake = netD(x_fake)
     D_fake = D_fake.mean()
+    netG.zero_grad()
     (-D_fake).backward()
 
     optimizerG.step()

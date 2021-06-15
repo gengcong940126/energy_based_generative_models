@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import numpy as np
 from tqdm import tqdm
 from train.classifier_mnist import Net
-from scipy.misc import imsave
+from imageio import imwrite
 import os
 from pathlib import Path
 
@@ -17,7 +17,7 @@ def KLD(p, q):
 class ModeCollapseEval(object):
     def __init__(self, n_stack, z_dim):
         self.classifier = Net().cuda()
-        self.classifier.load_state_dict(torch.load('pretrained_classifier.pt'))
+        self.classifier.load_state_dict(torch.load('logs/classifier/pretrained_classifier.pt'))
         self.n_stack = n_stack
         self.n_samples = 26 * 10 ** n_stack
         self.z_dim = z_dim
@@ -46,7 +46,7 @@ class ModeCollapseEval(object):
         return num_modes_cap, kld
 
 
-def tf_inception_score(netG, z_dim=128, n_samples=5000):
+def tf_inception_score(args, netG, z_dim=128, n_samples=5000):
     from inception_score import get_inception_score
     netG.eval()
     with torch.no_grad():
@@ -58,9 +58,28 @@ def tf_inception_score(netG, z_dim=128, n_samples=5000):
 
         images = torch.cat(images, 0).cpu().numpy()
     netG.train()
+    device = torch.device('cuda:0')
     return get_inception_score(images)
+def tf_fid_is_score(args, netG, z_dim=128, n_samples=5000):
+    from scripts.score import get_inception_and_fid_score
+    netG.eval()
+    with torch.no_grad():
+        images = []
+        for i in tqdm(range(n_samples // 100)):
+            z = torch.randn(100, z_dim).cuda()
+            x = netG(z)
+            images.append(x)
 
-
+        images = torch.cat(images, 0).cpu().numpy()
+    netG.train()
+    device = torch.device('cuda:0')
+    #return get_inception_score(images)
+    return get_inception_and_fid_score(images, device, args.fid_cache, verbose=True)
+def tf_fid_is_score_eval(args, images):
+    from scripts.score import get_inception_and_fid_score
+    device = torch.device('cuda:0')
+    #return get_inception_score(images)
+    return get_inception_and_fid_score(images, device, args.fid_cache, verbose=True)
 def tf_fid(netG, save_dir='/Tmp/kumarrit/cifar_samples/', z_dim=128, n_samples=5000):
     netG.eval()
     with torch.no_grad():

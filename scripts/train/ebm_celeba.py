@@ -14,8 +14,20 @@ from utils import save_samples
 from data.celeba import inf_train_gen
 from networks.celeba import Generator, EnergyModel, StatisticsNetwork
 from functions import train_generator, train_energy_model
+"""
+    Usage:
+
+        export CUDA_VISIBLE_DEVICES=2
+        export PORT=6006
+        export CUDA_HOME=/opt/cuda/cuda-10.2
+        export TIME_STR=1
+        python scripts/train/ebm_celeba.py --save_path logs/celeba
 
 
+    :return:
+    """
+if 'CUDA_VISIBLE_DEVICES' not in os.environ:
+    os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--save_path', required=True)
@@ -26,7 +38,7 @@ def parse_args():
     parser.add_argument('--energy_model_iters', type=int, default=5)
     parser.add_argument('--generator_iters', type=int, default=1)
     parser.add_argument('--mcmc_iters', type=int, default=0)
-    parser.add_argument('--lamda', type=float, default=10)
+    parser.add_argument('--lamda', type=float, default=0.1)
     parser.add_argument('--alpha', type=float, default=.01)
 
     parser.add_argument('--batch_size', type=int, default=64)
@@ -39,7 +51,7 @@ def parse_args():
 
 
 args = parse_args()
-root = Path(args.save_path)
+root = Path(os.path.join(args.save_path+  '/%02d' % args.energy_model_iters + '/%03d' % int(time.time())))
 #################################################
 # Create Directories
 #################################################
@@ -48,7 +60,8 @@ if root.exists():
     # os.system('rm -rf %s' % str(root))
 else:
     load = False
-
+if root.exists():
+    os.system("rm -rf %s" % str(root))
 os.makedirs(str(root))
 os.system('mkdir -p %s' % str(root / 'models'))
 os.system('mkdir -p %s' % str(root / 'images'))
@@ -75,7 +88,7 @@ optimizerH = torch.optim.Adam(netH.parameters(), **params)
 # Dump Original Data
 ########################################################################
 for i in range(8):
-    orig_data = itr.__next__()
+    orig_data = itr.next()[0]
     # save_image(orig_data, root / 'images/orig.png', normalize=True)
     img = make_grid(orig_data, normalize=True)
     writer.add_image('samples/original', img, i)
@@ -95,7 +108,7 @@ for iters in range(args.iters):
         )
 
     for i in range(args.energy_model_iters):
-        x_real = itr.__next__().cuda()
+        x_real = itr.next()[0].cuda()
         train_energy_model(
             x_real,
             netG, netE, optimizerE,

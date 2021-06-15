@@ -1,4 +1,4 @@
-from sklearn.datasets import make_swiss_roll
+from sklearn.datasets import make_swiss_roll,make_moons
 import numpy as np
 import random
 
@@ -6,7 +6,7 @@ import random
 def inf_train_gen(dataset, batch_size):
     if dataset == '25gaussians':
         dataset = []
-        for i in range(100000//25):
+        for i in range(150000//25):
             for x in range(-2, 3):
                 for y in range(-2, 3):
                     point = np.random.randn(2)*0.05
@@ -24,12 +24,19 @@ def inf_train_gen(dataset, batch_size):
         while True:
             data = make_swiss_roll(
                 n_samples=batch_size,
-                noise=0.25
+                noise=1
             )[0]
             data = data.astype('float32')[:, [0, 2]]
-            data /= 7.5  # stdev plus a little
+            data /= 5  # stdev plus a little
             yield data
-
+    elif dataset == 'twomoon':
+        while True:
+            data = make_moons(
+                n_samples=batch_size,
+                noise=0.1
+            )[0]
+            data = data.astype('float32')
+            yield data
     elif dataset == '8gaussians':
         scale = 2.
         centers = [

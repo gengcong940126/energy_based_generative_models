@@ -19,11 +19,11 @@ from functions import train_generator, train_energy_model
 """
     Usage:
 
-        export CUDA_VISIBLE_DEVICES=2
+        export CUDA_VISIBLE_DEVICES=0
         export PORT=6006
         export CUDA_HOME=/opt/cuda/cuda-10.2
         export TIME_STR=1
-        python scripts/train/ebm_toy.py --dataset 25gaussians --save_path logs
+        python scripts/train/ebm_toy.py --dataset twomoon --save_path logs
 
 
     :return:
@@ -39,9 +39,9 @@ def parse_args():
     parser.add_argument('--energy_model_iters', type=int, default=1)
     parser.add_argument('--generator_iters', type=int, default=1)
     parser.add_argument('--mcmc_iters', type=int, default=0)
-    parser.add_argument('--lamda', type=float, default=1)
+    parser.add_argument('--lamda', type=float, default=0.01)
     parser.add_argument('--alpha', type=float, default=.01)
-
+    parser.add_argument('--mode', type=str, default='0gp')
     parser.add_argument('--batch_size', type=int, default=200)
     parser.add_argument('--iters', type=int, default=150000)
     parser.add_argument('--n_points', type=int, default=1600)
@@ -73,7 +73,9 @@ itr = inf_train_gen(args.dataset, args.batch_size)
 netG = Generator2(args.z_dim, args.dim).cuda()
 netE = EnergyModel2(args.dim).cuda()
 netH = StatisticsNetwork(args.z_dim, args.dim).cuda()
-#netG.load_state_dict(torch.load('logs/twomoon_1/models/netG.pt'))
+# netE.load_state_dict(torch.load('logs/twomoon_soft/01/1623963113/models/netE.pt'))
+# netG.load_state_dict(torch.load('logs/twomoon_soft/01/1623963113/models/netG.pt'))
+# netH.load_state_dict(torch.load('logs/twomoon_soft/01/1623963113/models/netD.pt'))
 params = {'lr': 2e-4, 'betas': (0.0, 0.9)}
 optimizerE = torch.optim.Adam(netE.parameters(), **params)
 optimizerG = torch.optim.Adam(netG.parameters(), **params)

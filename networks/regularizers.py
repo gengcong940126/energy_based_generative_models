@@ -52,7 +52,8 @@ def gp_sm(netE, x,G_z):
     )[0]
     gradients2 = gradients2.flatten(start_dim=1)
     J = (gradients.norm(2, dim=1) ** 2).mean()+ (gradients2 * v).sum(dim=1).mean()*2
-    gp_loss=J*M.detach()
+    #gp_loss=J*M.detach()
+    gp_loss = J
     # L2 norm
     #gp_loss = J + (gradients2 * v).sum(dim=1).mean()
     return gp_loss

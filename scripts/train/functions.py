@@ -42,9 +42,10 @@ def train_energy_model(x_real, netG, netE, optimizerE, args, e_costs):
     x_fake = netG(z).detach()
     D_fake = netE(x_fake)
     D_fake = D_fake.mean()
-
-    #penalty = score_penalty(netE, x_real)
-    penalty = gp_sm(netE, x_real,x_fake)
+    if args.mode=='0gp':
+        penalty = score_penalty(netE, x_real)
+    else:
+        penalty = gp_sm(netE, x_real,x_fake)
     (D_real - D_fake + args.lamda * penalty).backward()
     optimizerE.step()
 
